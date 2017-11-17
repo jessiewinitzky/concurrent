@@ -1,5 +1,4 @@
 library(tidyverse)
-install.packages("rmarkdown")
 library(rmarkdown)
 
 concurrent <- read_csv("concurrent_20171101.csv")
@@ -508,25 +507,119 @@ slcc_cech_noce <- anti_join(slcc_cech, slcc_cech_only_ce, by = c("PIDM", "term_c
 #anti join slcc_noce to cech
 #first create term code variable for cech
 cech <- cech %>% mutate(term_code = ifelse(`Enrollment Begin` %in% 20120501:20120731, 201230,
-                                              ifelse(`Enrollment Begin` %in% 20120801:20121231, 201240,
-                                              ifelse(`Enrollment Begin` %in% 20130101:20130430, 201320,
-                                              ifelse(`Enrollment Begin` %in% 20130501:20130731, 201330,
-                                              ifelse(`Enrollment Begin` %in% 20130801:20131231, 201340,
-                                              ifelse(`Enrollment Begin` %in% 20140101:20140430, 201420,
-                                              ifelse(`Enrollment Begin` %in% 20140501:20140731, 201430,
-                                              ifelse(`Enrollment Begin` %in% 20140801:20141231, 201440,
-                                              ifelse(`Enrollment Begin` %in% 20150101:20150430, 201520,
-                                              ifelse(`Enrollment Begin` %in% 20150501:20150731, 201530,
-                                              ifelse(`Enrollment Begin` %in% 20150801:20151231, 201540,
-                                              ifelse(`Enrollment Begin` %in% 20160101:20160430, 201620,
-                                              ifelse(`Enrollment Begin` %in% 20160501:20160731, 201630,
-                                              ifelse(`Enrollment Begin` %in% 20160801:20161231, 201640,
-                                              ifelse(`Enrollment Begin` %in% 20170101:20170430, 201720,
-                                              ifelse(`Enrollment Begin` %in% 20170501:20170731, 201730,
-                                              ifelse(`Enrollment Begin` %in% 20170801:20171231, 201740,
-                                                     NA))))))))))))))))))
+                                    ifelse(`Enrollment Begin` %in% 20120801:20121231, 201240,
+                                    ifelse(`Enrollment Begin` %in% 20130101:20130430, 201320,
+                                    ifelse(`Enrollment Begin` %in% 20130501:20130731, 201330,
+                                    ifelse(`Enrollment Begin` %in% 20130801:20131231, 201340,
+                                    ifelse(`Enrollment Begin` %in% 20140101:20140430, 201420,
+                                    ifelse(`Enrollment Begin` %in% 20140501:20140731, 201430,
+                                    ifelse(`Enrollment Begin` %in% 20140801:20141231, 201440,
+                                    ifelse(`Enrollment Begin` %in% 20150101:20150430, 201520,
+                                    ifelse(`Enrollment Begin` %in% 20150501:20150731, 201530,
+                                    ifelse(`Enrollment Begin` %in% 20150801:20151231, 201540,
+                                    ifelse(`Enrollment Begin` %in% 20160101:20160430, 201620,
+                                    ifelse(`Enrollment Begin` %in% 20160501:20160731, 201630,
+                                    ifelse(`Enrollment Begin` %in% 20160801:20161231, 201640,
+                                    ifelse(`Enrollment Begin` %in% 20170101:20170430, 201720,
+                                    ifelse(`Enrollment Begin` %in% 20170501:20170731, 201730,
+                                    ifelse(`Enrollment Begin` %in% 20170801:20171231, 201740,
+                                           NA))))))))))))))))))
 #then anti join slcc noce to cech
 cech_noce <- anti_join(cech, slcc_cech_only_ce, by = c("PIDM", "term_code"))
 
-cech_noce_colleges <- cech_noce %>% group_by(PIDM, `College Name`) %>% summarize(n()) %>%
-  group_by(`College Name`) %>% summarize(count = n())
+####which colleges after high school?####
+
+#first college attended after ce
+#locate first class by term_code
+first_coll <- cech_noce %>%
+  group_by(PIDM) %>% 
+  arrange(term_code) %>%
+  slice(1) %>%
+  ungroup
+
+first_coll_sum <- first_coll %>% mutate(`College Name` = ifelse(is.na(`College Name`), "NO COLLEGE", `College Name`)) %>%
+  group_by(`College Name`) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent = count/sum(count)*100) %>% 
+  arrange(desc(count)) %>%
+  slice(1:10)
+
+#reorder so most frequent colleges appear first
+first_coll_sum$`College Name` <- factor(first_coll_sum$`College Name`, level = first_coll_sum$`College Name`[order(first_coll_sum$count)])
+
+#plot of first institution attended after HS graduation
+chart_firstcoll <- first_coll_sum %>%
+  ggplot(aes(`College Name`, percent)) +
+  geom_col(fill = "#00A8E1") +
+  theme_minimal() +
+  coord_flip() +
+  labs(title = "First institution attended after high school graduation",
+       subtitle = "For more than 60% of concurrent students, SLCC was the first college they attended after high school.",
+       x = "Institution", y = "Percent",
+       caption = "*The figure next to each bar represents the count of students who attended that institution") +
+  geom_text(aes(label = count), hjust = -0.25) +
+  ylim(0, 100)
+
+#ever attended slcc after graduation
+college_ever <- cech_noce %>%
+  group_by(PIDM, `College Name`) %>%
+  summarize(count = 1) %>%
+  group_by(`College Name`) %>%
+  summarise(count = sum(count)) %>%
+  arrange(desc(count)) %>%
+  mutate(freq = count/11235*100) %>%
+  slice(1:10) %>%
+  mutate(`College Name` = ifelse(is.na(`College Name`), "NO COLLEGE", `College Name`))
+
+#reorder so most frequent colleges appear first
+college_ever$`College Name` <- factor(college_ever$`College Name`, level = college_ever$`College Name`[order(college_ever$count)])
+
+#plot
+college_ever %>%
+  ggplot(aes(`College Name`, freq))+
+  geom_col(fill = "#00A8E1") +
+  theme_minimal() +
+  coord_flip() +
+  labs(title = "Institutions ever attended after high school graduation",
+       subtitle = "Nearly 80% of concurrent students attended SLCC after graduating from high school.",
+       x = "Institution", y = "Percent",
+       caption = "*The figure next to each bar represents the count of students who attended that institution") +
+  geom_text(aes(label = count), hjust = -0.25) +
+  ylim(0, 100)
+
+
+####what ce courses do students take?####
+chart_commoncourses <- ce_gr_join %>% group_by(class) %>%
+  summarize(count=n(), average_grade = mean(grade_num, na.rm=TRUE)) %>%
+  arrange(desc(count)) %>%
+  slice(1:10) %>%
+  ggplot(aes(x = reorder(class, count), count)) +
+  geom_col(fill = "#00A8E1") +
+  coord_flip() +
+  labs(title = "Most frequent concurrent courses taken",
+       x = "Course",
+       y = "Count",
+       subtitle = "Math and English are the most popular concurrent classes") +
+  geom_text(aes(label = count), hjust = -.25) +
+  ylim(0,4000) +
+  theme_minimal()
+#MA 1100 = Medical Terminology
+#FIN 1050 = Personal Finance
+#FHS 2400 = Marriage and family relations
+
+first_coll_sum$`College Name` <- factor(first_coll_sum$`College Name`, level = first_coll_sum$`College Name`[order(first_coll_sum$count)])
+
+#students who retake courses: 187 of them
+ce_gr_join %>% group_by(PIDM, class) %>%
+  summarise(count = n(),
+            mean_grade = mean(grade_num, na.rm = TRUE), 
+            min_grade = min(grade_num, na.rm = TRUE), 
+            max_grade = max(grade_num, na.rm = TRUE),
+            firstterm = min(TERM_CODE),
+            lastterm = max(TERM_CODE)) %>%
+  filter(count > 1) %>%
+  arrange(desc(count))
+#41,483 students overall; 187 retook a concurrent course
+# this is 0.04% of students. I'm not going to worry about them.
+
+#most common subject?
